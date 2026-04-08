@@ -22,9 +22,11 @@ interface Props {
   totalPages: number
   search: string
   kondisiFilter: string
+  sort: string
+  order: string
 }
 
-export default function AsetTable({ data, total, page, totalPages, search, kondisiFilter }: Props) {
+export default function AsetTable({ data, total, page, totalPages, search, kondisiFilter, sort, order }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -34,6 +36,19 @@ export default function AsetTable({ data, total, page, totalPages, search, kondi
     else params.delete(key)
     if (key !== 'page') params.delete('page')
     router.push(`/aset?${params.toString()}`)
+  }
+
+  function handleSort(col: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sort', col)
+    params.set('order', sort === col && order === 'asc' ? 'desc' : 'asc')
+    params.delete('page')
+    router.push(`/aset?${params.toString()}`)
+  }
+
+  function SortIcon({ col }: { col: string }) {
+    if (sort !== col) return <span className="text-gray-300 ml-1">↕</span>
+    return <span className="ml-1" style={{ color: 'var(--pkp-teal)' }}>{order === 'asc' ? '↑' : '↓'}</span>
   }
 
   const kondisiList = ['', 'BAIK', 'RUSAK_RINGAN', 'RUSAK_BERAT', 'BERLEBIH', 'TIDAK_DITEMUKAN', 'SENGKETA']
@@ -79,12 +94,12 @@ export default function AsetTable({ data, total, page, totalPages, search, kondi
             <thead>
               <tr className="bg-gray-50 text-left">
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">No</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500">Nama Barang</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('namaBarang')}>Nama Barang<SortIcon col="namaBarang" /></th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Kode</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">NUP</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Tahun</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500">Kondisi</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500">Lokasi</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('nup')}>NUP<SortIcon col="nup" /></th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('tahunPerolehan')}>Tahun<SortIcon col="tahunPerolehan" /></th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('kondisi')}>Kondisi<SortIcon col="kondisi" /></th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('lokasi')}>Lokasi<SortIcon col="lokasi" /></th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Foto</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500"></th>
               </tr>

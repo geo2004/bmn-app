@@ -6,13 +6,15 @@ import { Kondisi } from '@prisma/client'
 export default async function AsetPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string; kondisi?: string }>
+  searchParams: Promise<{ page?: string; search?: string; kondisi?: string; sort?: string; order?: string }>
 }) {
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1'))
   const limit = 20
   const search = params.search ?? ''
   const kondisiFilter = params.kondisi ?? ''
+  const sort = params.sort ?? 'namaBarang'
+  const order = params.order === 'desc' ? 'desc' : 'asc'
 
   const where = {
     ...(search ? {
@@ -30,7 +32,7 @@ export default async function AsetPage({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: [{ kondisi: 'asc' }, { namaBarang: 'asc' }],
+      orderBy: [{ [sort]: order }],
       select: {
         id: true,
         namaBarang: true,
@@ -69,6 +71,8 @@ export default async function AsetPage({
         totalPages={Math.ceil(total / limit)}
         search={search}
         kondisiFilter={kondisiFilter}
+        sort={sort}
+        order={order}
       />
     </div>
   )

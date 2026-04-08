@@ -33,7 +33,9 @@ export default function UpdatePage() {
   const [namaList, setNamaList] = useState<string[]>([])
   const [loadingNama, setLoadingNama] = useState(true)
 
+  const [namaQuery, setNamaQuery] = useState('')
   const [selectedNama, setSelectedNama] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [nupOptions, setNupOptions] = useState<NupOption[]>([])
   const [selectedNup, setSelectedNup] = useState('')
 
@@ -61,21 +63,25 @@ export default function UpdatePage() {
       .finally(() => setLoadingNama(false))
   }, [])
 
-  // Load NUPs when nama changes
-  async function handleNamaChange(nama: string) {
+  const suggestions = namaQuery.length >= 1
+    ? namaList.filter(n => n.toLowerCase().includes(namaQuery.toLowerCase())).slice(0, 8)
+    : []
+
+  // Load NUPs when nama is selected from suggestions
+  async function handleNamaSelect(nama: string) {
     setSelectedNama(nama)
+    setNamaQuery(nama)
+    setShowSuggestions(false)
     setSelectedNup('')
     setNupOptions([])
     setSelectedAset(null)
     setSaved(false)
     setError('')
-    if (!nama) return
 
     const res = await fetch(`/api/aset/cari?nama=${encodeURIComponent(nama)}`)
     const data: NupOption[] = await res.json()
     setNupOptions(data)
 
-    // Auto-select if only one NUP
     if (data.length === 1) {
       setSelectedNup(data[0].nup ?? '')
       loadAset(data[0].id)
@@ -167,6 +173,8 @@ export default function UpdatePage() {
 
   function resetForm() {
     setSelectedNama('')
+    setNamaQuery('')
+    setShowSuggestions(false)
     setSelectedNup('')
     setNupOptions([])
     setSelectedAset(null)
@@ -191,20 +199,40 @@ export default function UpdatePage() {
         <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
           <div className="text-xs font-semibold text-gray-400 uppercase">Pilih Aset</div>
 
-          {/* Tipe Barang dropdown */}
-          <div>
+          {/* Tipe Barang autocomplete */}
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Barang</label>
-            <select
-              value={selectedNama}
-              onChange={(e) => handleNamaChange(e.target.value)}
+            <input
+              type="search"
+              value={namaQuery}
+              onChange={(e) => {
+                setNamaQuery(e.target.value)
+                setSelectedNama('')
+                setNupOptions([])
+                setSelectedAset(null)
+                setShowSuggestions(true)
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder={loadingNama ? 'Memuat...' : 'Ketik nama barang...'}
               disabled={loadingNama}
-              className={selectCls}
-            >
-              <option value="">{loadingNama ? 'Memuat...' : '— Pilih tipe barang —'}</option>
-              {namaList.map(nama => (
-                <option key={nama} value={nama}>{nama}</option>
-              ))}
-            </select>
+              autoComplete="off"
+              className={inputCls}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                {suggestions.map(nama => (
+                  <button
+                    key={nama}
+                    type="button"
+                    onMouseDown={() => handleNamaSelect(nama)}
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                  >
+                    {nama}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* NUP input */}
