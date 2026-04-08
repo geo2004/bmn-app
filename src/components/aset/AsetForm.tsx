@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { KONDISI_LABELS, getKlasifikasi } from '@/lib/constants'
+import { KONDISI_LABELS, getKlasifikasi, LOKASI_OPTIONS } from '@/lib/constants'
 
 interface AsetFormData {
   id?: string
@@ -279,13 +279,14 @@ export default function AsetForm({ initial }: { initial?: AsetFormData }) {
           </div>
           <div>
             <label className={labelCls}>Lokasi / Ruangan</label>
-            <input
-              type="text"
+            <select
               value={form.lokasi ?? ''}
               onChange={(e) => handleChange('lokasi', e.target.value || null)}
               className={inputCls}
-              placeholder="Ruang kerja / lantai"
-            />
+            >
+              <option value="">— Pilih lokasi —</option>
+              {LOKASI_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
           </div>
           <div>
             <label className={labelCls}>Koordinat GPS</label>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { KONDISI_LABELS, getKlasifikasi } from '@/lib/constants'
+import { KONDISI_LABELS, getKlasifikasi, LOKASI_OPTIONS } from '@/lib/constants'
 import { signOut } from 'next-auth/react'
 
 interface NupOption {
@@ -326,13 +326,14 @@ export default function UpdatePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Lokasi / Ruangan</label>
-              <input
-                type="text"
+              <select
                 value={lokasi}
                 onChange={(e) => setLokasi(e.target.value)}
-                className={inputCls}
-                placeholder="Ruang / gedung"
-              />
+                className={selectCls}
+              >
+                <option value="">— Pilih lokasi —</option>
+                {LOKASI_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
             </div>
 
             <div>

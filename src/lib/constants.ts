@@ -37,6 +37,26 @@ export function getKlasifikasi(kondisi: string): string {
   }
 }
 
+export const LOKASI_OPTIONS = [
+  'Ruang Kabalai',
+  'Ruang Kasubag UTU',
+  'Ruang Rapat PPK',
+  'Ruang UTU',
+  'Ruang Pendopo',
+  'Ruang Tunggu',
+  'Ruang Resepsionis',
+  'Ruang Security',
+  'Ruang Seksi Wilayah II',
+  'Ruang Kepala Seksi Wilayah II',
+  'Ruang Kepala Seksi Wilayah I',
+  'Ruang Seksi Wilayah I',
+  'Ruang Klinik Selatan',
+  'Ruang Klinik Utara',
+  'Lantai II Bima',
+  'Lapangan Tenis',
+  'Gudang BMN',
+]
+
 export const SHEET_TO_KONDISI: Record<string, string> = {
   'Kondisi Baik': 'BAIK',
   'Kondisi Rusak Ringan': 'RUSAK_RINGAN',
