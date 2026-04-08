@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AsetBmn {
+  id                   String   @id @default(uuid())
+  no                   Int?
+  kodeBarang           String?
+  namaBarang           String
+  nup                  String?
+  tahunPerolehan       Int?
+  satuan               String?
+  kuantitas            Decimal? @db.Decimal(15, 2)
+  nilaiPerolehan       Decimal? @db.Decimal(20, 2)
+  merkType             String?
+  menurutAdministrasi  Decimal? @db.Decimal(15, 2)
+  menurutInventarisasi Decimal? @db.Decimal(15, 2)
+  kondisi              Kondisi
+  klasifikasi          String?
+  lokasi               String?
+  alamat               String?
+  koordinat            String?
+  fotoUrl              String?
+  ket                  String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([namaBarang])
+  @@index([kodeBarang, nup])
+}
+
+enum Kondisi {
+  BAIK
+  RUSAK_RINGAN
+  RUSAK_BERAT
+  TIDAK_DITEMUKAN
+  BERLEBIH
+  SENGKETA
+}

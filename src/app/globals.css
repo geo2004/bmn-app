@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+:root {
+  --pkp-teal: #113F51;
+  --pkp-teal-mid: #0E5B73;
+  --pkp-teal-light: #1a5f78;
+  --pkp-gold: #D5C58A;
+  --pkp-gold-dark: #CDB278;
+  --pkp-bg: #f0f4f6;
+}
+
+body {
+  background: var(--pkp-bg);
+  font-family: var(--font-inter), Inter, sans-serif;
+}
+
+.badge-BAIK { background: #dcfce7; color: #15803d; }
+.badge-RUSAK_RINGAN { background: #fef3c7; color: #b45309; }
+.badge-RUSAK_BERAT { background: #fee2e2; color: #b91c1c; }
+.badge-TIDAK_DITEMUKAN { background: #f3f4f6; color: #374151; }
+.badge-BERLEBIH { background: #dbeafe; color: #1d4ed8; }
+.badge-SENGKETA { background: #ede9fe; color: #6d28d9; }

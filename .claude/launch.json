@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bmn-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "C:/Users/User/OneDrive - Kementerian PKP/Workspace2026/Aplikasi/bmn-app"],
+      "port": 3000
+    }
+  ]
+}
