@@ -38,6 +38,8 @@ export default function UpdatePage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [nupOptions, setNupOptions] = useState<NupOption[]>([])
   const [selectedNup, setSelectedNup] = useState('')
+  const [nupQuery, setNupQuery] = useState('')
+  const [showNupSuggestions, setShowNupSuggestions] = useState(false)
 
   const [selectedAset, setSelectedAset] = useState<AsetDetail | null>(null)
   const [loadingAset, setLoadingAset] = useState(false)
@@ -73,6 +75,7 @@ export default function UpdatePage() {
     setNamaQuery(nama)
     setShowSuggestions(false)
     setSelectedNup('')
+    setNupQuery('')
     setNupOptions([])
     setSelectedAset(null)
     setSaved(false)
@@ -176,6 +179,8 @@ export default function UpdatePage() {
     setNamaQuery('')
     setShowSuggestions(false)
     setSelectedNup('')
+    setNupQuery('')
+    setShowNupSuggestions(false)
     setNupOptions([])
     setSelectedAset(null)
     setFotoFile(null)
@@ -235,24 +240,49 @@ export default function UpdatePage() {
             )}
           </div>
 
-          {/* NUP input */}
+          {/* NUP autocomplete */}
           {nupOptions.length > 1 && (
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 NUP <span className="text-gray-400 font-normal">({nupOptions.length} item tersedia)</span>
               </label>
-              <select
-                value={selectedNup}
-                onChange={(e) => handleNupChange(e.target.value)}
-                className={selectCls}
-              >
-                <option value="">— Pilih NUP —</option>
-                {nupOptions.map(o => (
-                  <option key={o.id} value={o.nup ?? ''}>
-                    NUP {o.nup ?? '-'}{o.lokasi ? ` · ${o.lokasi}` : ''} · {KONDISI_LABELS[o.kondisi] ?? o.kondisi}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="search"
+                value={nupQuery}
+                onChange={(e) => {
+                  setNupQuery(e.target.value)
+                  setSelectedNup('')
+                  setSelectedAset(null)
+                  setShowNupSuggestions(true)
+                }}
+                onFocus={() => setShowNupSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowNupSuggestions(false), 150)}
+                placeholder="Ketik NUP..."
+                autoComplete="off"
+                className={inputCls}
+              />
+              {showNupSuggestions && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                  {nupOptions
+                    .filter(o => !nupQuery || (o.nup ?? '').includes(nupQuery))
+                    .map(o => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onMouseDown={() => {
+                          setNupQuery(o.nup ?? '')
+                          handleNupChange(o.nup ?? '')
+                          setShowNupSuggestions(false)
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                      >
+                        <span className="font-medium">NUP {o.nup ?? '-'}</span>
+                        {o.lokasi && <span className="text-gray-400"> · {o.lokasi}</span>}
+                        <span className="text-gray-400"> · {KONDISI_LABELS[o.kondisi] ?? o.kondisi}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
