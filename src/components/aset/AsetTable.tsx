@@ -26,15 +26,19 @@ interface Props {
   tahunFilter: string
   lokasiFilter: string
   fotoFilter: string
+  namaFilter: string
+  nupFilter: string
   sort: string
   order: string
   distinctTahun: number[]
+  distinctNama: string[]
+  distinctNup: string[]
 }
 
 export default function AsetTable({
   data, total, page, totalPages,
-  search, kondisiFilter, tahunFilter, lokasiFilter, fotoFilter,
-  sort, order, distinctTahun,
+  search, kondisiFilter, tahunFilter, lokasiFilter, fotoFilter, namaFilter, nupFilter,
+  sort, order, distinctTahun, distinctNama, distinctNup,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -81,6 +85,8 @@ export default function AsetTable({
   const tahunSelected = tahunFilter ? tahunFilter.split(',').filter(Boolean) : []
   const lokasiSelected = lokasiFilter ? lokasiFilter.split(',').filter(Boolean) : []
   const fotoSelected = fotoFilter ? [fotoFilter] : []
+  const namaSelected = namaFilter ? namaFilter.split(',').filter(Boolean) : []
+  const nupSelected = nupFilter ? nupFilter.split(',').filter(Boolean) : []
 
   // Option lists for each column
   const kondisiOptions = Object.entries(KONDISI_LABELS).map(([k, v]) => ({ value: k, label: v }))
@@ -90,12 +96,16 @@ export default function AsetTable({
     { value: 'ada', label: 'Ada Foto' },
     { value: 'tidak', label: 'Tidak Ada Foto' },
   ]
+  const namaOptions = distinctNama.map((n) => ({ value: n, label: n }))
+  const nupOptions = distinctNup.map((n) => ({ value: n, label: n }))
 
   // Active filter chips for summary bar
   const activeFilters: { key: string; label: string; value: string }[] = []
+  if (namaSelected.length > 0) activeFilters.push({ key: 'nama', label: 'Nama', value: namaSelected.length > 2 ? `${namaSelected.length} dipilih` : namaSelected.join(', ') })
+  if (nupSelected.length > 0) activeFilters.push({ key: 'nup', label: 'NUP', value: nupSelected.join(', ') })
   if (kondisiSelected.length > 0) activeFilters.push({ key: 'kondisi', label: 'Kondisi', value: kondisiSelected.map((k) => KONDISI_LABELS[k] ?? k).join(', ') })
   if (tahunSelected.length > 0) activeFilters.push({ key: 'tahun', label: 'Tahun', value: tahunSelected.join(', ') })
-  if (lokasiSelected.length > 0) activeFilters.push({ key: 'lokasi', label: 'Lokasi', value: lokasiSelected.join(', ') })
+  if (lokasiSelected.length > 0) activeFilters.push({ key: 'lokasi', label: 'Lokasi', value: lokasiSelected.length > 2 ? `${lokasiSelected.length} dipilih` : lokasiSelected.join(', ') })
   if (fotoSelected.length > 0) activeFilters.push({ key: 'foto', label: 'Foto', value: fotoSelected[0] === 'ada' ? 'Ada Foto' : 'Tidak Ada Foto' })
 
   return (
@@ -159,12 +169,30 @@ export default function AsetTable({
             <thead>
               <tr className="bg-gray-50 text-left">
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">No</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500 cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('namaBarang')}>
-                  Nama Barang<SortIcon col="namaBarang" />
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 relative">
+                  <div className="flex items-center gap-1">
+                    <span className="cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('namaBarang')}>
+                      Nama Barang<SortIcon col="namaBarang" />
+                    </span>
+                    <ColumnFilter
+                      options={namaOptions}
+                      selected={namaSelected}
+                      onChange={(vals) => updateMultiParam('nama', vals)}
+                    />
+                  </div>
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Kode</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('nup')}>
-                  NUP<SortIcon col="nup" />
+                <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap relative">
+                  <div className="flex items-center gap-1">
+                    <span className="cursor-pointer hover:text-gray-700 select-none" onClick={() => handleSort('nup')}>
+                      NUP<SortIcon col="nup" />
+                    </span>
+                    <ColumnFilter
+                      options={nupOptions}
+                      selected={nupSelected}
+                      onChange={(vals) => updateMultiParam('nup', vals)}
+                    />
+                  </div>
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap relative">
                   <div className="flex items-center gap-1">

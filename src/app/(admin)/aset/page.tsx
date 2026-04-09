@@ -5,7 +5,7 @@ import { Kondisi } from '@prisma/client'
 export default async function AsetPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string; kondisi?: string; sort?: string; order?: string; tahun?: string; lokasi?: string; foto?: string }>
+  searchParams: Promise<{ page?: string; search?: string; kondisi?: string; sort?: string; order?: string; tahun?: string; lokasi?: string; foto?: string; nama?: string; nup?: string }>
 }) {
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1'))
@@ -15,6 +15,8 @@ export default async function AsetPage({
   const tahunFilter = params.tahun ?? ''
   const lokasiFilter = params.lokasi ?? ''
   const fotoFilter = params.foto ?? ''
+  const namaFilter = params.nama ?? ''
+  const nupFilter = params.nup ?? ''
   const sort = params.sort ?? 'namaBarang'
   const order = params.order === 'desc' ? 'desc' : 'asc'
 
@@ -22,6 +24,8 @@ export default async function AsetPage({
   const kondisiArr = kondisiFilter ? kondisiFilter.split(',').filter(Boolean) as Kondisi[] : []
   const tahunArr = tahunFilter ? tahunFilter.split(',').map(Number).filter(Boolean) : []
   const lokasiArr = lokasiFilter ? lokasiFilter.split(',').filter(Boolean) : []
+  const namaArr = namaFilter ? namaFilter.split(',').filter(Boolean) : []
+  const nupArr = nupFilter ? nupFilter.split(',').filter(Boolean) : []
 
   const where = {
     ...(search ? {
@@ -36,9 +40,11 @@ export default async function AsetPage({
     ...(lokasiArr.length > 0 ? { lokasi: { in: lokasiArr } } : {}),
     ...(fotoFilter === 'ada' ? { fotoUrl: { not: null } } : {}),
     ...(fotoFilter === 'tidak' ? { fotoUrl: null } : {}),
+    ...(namaArr.length > 0 ? { namaBarang: { in: namaArr } } : {}),
+    ...(nupArr.length > 0 ? { nup: { in: nupArr } } : {}),
   }
 
-  const [rawData, total, distinctTahunRows] = await Promise.all([
+  const [rawData, total, distinctTahunRows, distinctNamaRows, distinctNupRows] = await Promise.all([
     prisma.asetBmn.findMany({
       where,
       skip: (page - 1) * limit,
@@ -62,11 +68,24 @@ export default async function AsetPage({
       where: { tahunPerolehan: { not: null } },
       orderBy: { tahunPerolehan: 'desc' },
     }),
+    prisma.asetBmn.findMany({
+      select: { namaBarang: true },
+      distinct: ['namaBarang'],
+      orderBy: { namaBarang: 'asc' },
+    }),
+    prisma.asetBmn.findMany({
+      select: { nup: true },
+      distinct: ['nup'],
+      where: { nup: { not: null } },
+      orderBy: { nup: 'asc' },
+    }),
   ])
 
   const distinctTahun = distinctTahunRows
     .map((r) => r.tahunPerolehan as number)
     .filter(Boolean)
+  const distinctNama = distinctNamaRows.map((r) => r.namaBarang)
+  const distinctNup = distinctNupRows.map((r) => r.nup as string)
 
   return (
     <div>
@@ -95,9 +114,13 @@ export default async function AsetPage({
         tahunFilter={tahunFilter}
         lokasiFilter={lokasiFilter}
         fotoFilter={fotoFilter}
+        namaFilter={namaFilter}
+        nupFilter={nupFilter}
         sort={sort}
         order={order}
         distinctTahun={distinctTahun}
+        distinctNama={distinctNama}
+        distinctNup={distinctNup}
       />
     </div>
   )

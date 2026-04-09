@@ -12,16 +12,28 @@ interface Props {
   selected: string[]
   onChange: (values: string[]) => void
   align?: 'left' | 'right'
+  searchable?: boolean
 }
 
-export default function ColumnFilter({ options, selected, onChange, align = 'left' }: Props) {
+export default function ColumnFilter({ options, selected, onChange, align = 'left', searchable }: Props) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const allRef = useRef<HTMLInputElement>(null)
+
+  const showSearch = searchable ?? options.length > 8
+  const visibleOptions = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options
 
   const isActive = selected.length > 0
   const allSelected = selected.length === options.length
   const someSelected = selected.length > 0 && selected.length < options.length
+
+  // Reset search when closing
+  useEffect(() => {
+    if (!open) setQuery('')
+  }, [open])
 
   // Indeterminate state for "Select All"
   useEffect(() => {
@@ -104,9 +116,24 @@ export default function ColumnFilter({ options, selected, onChange, align = 'lef
       {/* Dropdown */}
       {open && (
         <div
-          className="absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-40"
+          className="absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-48 max-w-72"
           style={{ [align === 'right' ? 'right' : 'left']: 0 }}
         >
+          {/* Search box for long lists */}
+          {showSearch && (
+            <div className="px-2 py-1.5 border-b border-gray-100">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Cari..."
+                className="w-full text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1"
+                style={{ '--tw-ring-color': 'var(--pkp-teal)' } as React.CSSProperties}
+                autoFocus
+              />
+            </div>
+          )}
+
           {/* Select All */}
           <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 text-xs font-medium text-gray-700">
             <input
@@ -122,19 +149,22 @@ export default function ColumnFilter({ options, selected, onChange, align = 'lef
 
           {/* Options list */}
           <div className="max-h-52 overflow-y-auto">
-            {options.map((opt) => (
+            {visibleOptions.length === 0 && (
+              <p className="px-3 py-2 text-xs text-gray-400 italic">Tidak ditemukan</p>
+            )}
+            {visibleOptions.map((opt) => (
               <label
                 key={opt.value}
-                className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-xs text-gray-600"
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-xs text-gray-600 min-w-0"
               >
                 <input
                   type="checkbox"
                   checked={selected.includes(opt.value)}
                   onChange={() => toggleValue(opt.value)}
-                  className="rounded"
+                  className="rounded shrink-0"
                   style={{ accentColor: 'var(--pkp-teal)' }}
                 />
-                {opt.label}
+                <span className="truncate">{opt.label}</span>
               </label>
             ))}
           </div>
