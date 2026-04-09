@@ -1,15 +1,53 @@
 import { prisma } from '@/lib/prisma'
+import { unstable_cache } from 'next/cache'
 import AsetTable from '@/components/aset/AsetTable'
 import { Kondisi } from '@prisma/client'
+
+// Distinct values change infrequently — cache for 60 seconds to avoid
+// re-querying the full table on every filter navigation.
+const getDistinctValues = unstable_cache(
+  async () => {
+    const [tahunRows, namaRows, nupRows] = await Promise.all([
+      prisma.asetBmn.findMany({
+        select: { tahunPerolehan: true },
+        distinct: ['tahunPerolehan'],
+        where: { tahunPerolehan: { not: null } },
+        orderBy: { tahunPerolehan: 'desc' },
+      }),
+      prisma.asetBmn.findMany({
+        select: { namaBarang: true },
+        distinct: ['namaBarang'],
+        orderBy: { namaBarang: 'asc' },
+      }),
+      prisma.asetBmn.findMany({
+        select: { nup: true },
+        distinct: ['nup'],
+        where: { nup: { not: null } },
+        orderBy: { nup: 'asc' },
+      }),
+    ])
+    return {
+      distinctTahun: tahunRows.map((r) => r.tahunPerolehan as number),
+      distinctNama: namaRows.map((r) => r.namaBarang),
+      distinctNup: nupRows.map((r) => r.nup as string),
+    }
+  },
+  ['aset-distinct-values'],
+  { revalidate: 60 },
+)
 
 export default async function AsetPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string; kondisi?: string; sort?: string; order?: string; tahun?: string; lokasi?: string; foto?: string; nama?: string; nup?: string }>
+  searchParams: Promise<{
+    page?: string; search?: string; kondisi?: string; sort?: string; order?: string
+    tahun?: string; lokasi?: string; foto?: string; nama?: string; nup?: string; limit?: string
+  }>
 }) {
   const params = await searchParams
+  const limitRaw = parseInt(params.limit ?? '20')
+  const limit = [20, 50, 100].includes(limitRaw) ? limitRaw : 20
   const page = Math.max(1, parseInt(params.page ?? '1'))
-  const limit = 20
   const search = params.search ?? ''
   const kondisiFilter = params.kondisi ?? ''
   const tahunFilter = params.tahun ?? ''
@@ -20,7 +58,6 @@ export default async function AsetPage({
   const sort = params.sort ?? 'namaBarang'
   const order = params.order === 'desc' ? 'desc' : 'asc'
 
-  // Parse multi-select filters from comma-separated strings
   const kondisiArr = kondisiFilter ? kondisiFilter.split(',').filter(Boolean) as Kondisi[] : []
   const tahunArr = tahunFilter ? tahunFilter.split(',').map(Number).filter(Boolean) : []
   const lokasiArr = lokasiFilter ? lokasiFilter.split(',').filter(Boolean) : []
@@ -44,7 +81,7 @@ export default async function AsetPage({
     ...(nupArr.length > 0 ? { nup: { in: nupArr } } : {}),
   }
 
-  const [rawData, total, distinctTahunRows, distinctNamaRows, distinctNupRows] = await Promise.all([
+  const [rawData, total, { distinctTahun, distinctNama, distinctNup }] = await Promise.all([
     prisma.asetBmn.findMany({
       where,
       skip: (page - 1) * limit,
@@ -62,30 +99,8 @@ export default async function AsetPage({
       },
     }),
     prisma.asetBmn.count({ where }),
-    prisma.asetBmn.findMany({
-      select: { tahunPerolehan: true },
-      distinct: ['tahunPerolehan'],
-      where: { tahunPerolehan: { not: null } },
-      orderBy: { tahunPerolehan: 'desc' },
-    }),
-    prisma.asetBmn.findMany({
-      select: { namaBarang: true },
-      distinct: ['namaBarang'],
-      orderBy: { namaBarang: 'asc' },
-    }),
-    prisma.asetBmn.findMany({
-      select: { nup: true },
-      distinct: ['nup'],
-      where: { nup: { not: null } },
-      orderBy: { nup: 'asc' },
-    }),
+    getDistinctValues(),
   ])
-
-  const distinctTahun = distinctTahunRows
-    .map((r) => r.tahunPerolehan as number)
-    .filter(Boolean)
-  const distinctNama = distinctNamaRows.map((r) => r.namaBarang)
-  const distinctNup = distinctNupRows.map((r) => r.nup as string)
 
   return (
     <div>
@@ -109,6 +124,7 @@ export default async function AsetPage({
         total={total}
         page={page}
         totalPages={Math.ceil(total / limit)}
+        limit={limit}
         search={search}
         kondisiFilter={kondisiFilter}
         tahunFilter={tahunFilter}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTransition } from 'react'
 import { KONDISI_LABELS, LOKASI_OPTIONS } from '@/lib/constants'
 import ColumnFilter from './ColumnFilter'
 
@@ -21,6 +22,7 @@ interface Props {
   total: number
   page: number
   totalPages: number
+  limit: number
   search: string
   kondisiFilter: string
   tahunFilter: string
@@ -36,19 +38,24 @@ interface Props {
 }
 
 export default function AsetTable({
-  data, total, page, totalPages,
+  data, total, page, totalPages, limit,
   search, kondisiFilter, tahunFilter, lokasiFilter, fotoFilter, namaFilter, nupFilter,
   sort, order, distinctTahun, distinctNama, distinctNup,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [isPending, startTransition] = useTransition()
+
+  function navigate(url: string) {
+    startTransition(() => router.push(url))
+  }
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString())
     if (value) params.set(key, value)
     else params.delete(key)
     if (key !== 'page') params.delete('page')
-    router.push(`/aset?${params.toString()}`)
+    navigate(`/aset?${params.toString()}`)
   }
 
   function updateMultiParam(key: string, values: string[]) {
@@ -56,7 +63,7 @@ export default function AsetTable({
     if (values.length > 0) params.set(key, values.join(','))
     else params.delete(key)
     params.delete('page')
-    router.push(`/aset?${params.toString()}`)
+    navigate(`/aset?${params.toString()}`)
   }
 
   function handleSort(col: string) {
@@ -64,7 +71,7 @@ export default function AsetTable({
     params.set('sort', col)
     params.set('order', sort === col && order === 'asc' ? 'desc' : 'asc')
     params.delete('page')
-    router.push(`/aset?${params.toString()}`)
+    navigate(`/aset?${params.toString()}`)
   }
 
   function clearAllFilters() {
@@ -72,7 +79,8 @@ export default function AsetTable({
     if (search) params.set('search', search)
     if (sort !== 'namaBarang') params.set('sort', sort)
     if (order !== 'asc') params.set('order', order)
-    router.push(`/aset?${params.toString()}`)
+    if (limit !== 20) params.set('limit', String(limit))
+    navigate(`/aset?${params.toString()}`)
   }
 
   function SortIcon({ col }: { col: string }) {
@@ -160,10 +168,38 @@ export default function AsetTable({
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 text-xs text-gray-500">
-          {total} aset ditemukan
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden relative">
+        {/* Loading overlay */}
+        {isPending && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.65)' }}>
+            <div className="flex flex-col items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: 'var(--pkp-teal)', borderTopColor: 'transparent' }}
+              />
+              <span className="text-xs font-medium" style={{ color: 'var(--pkp-teal)' }}>Memuat...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Top bar: count + rows per page */}
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs text-gray-500">{total} aset ditemukan</span>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>Tampilkan</span>
+            <select
+              value={limit}
+              onChange={(e) => updateParam('limit', e.target.value)}
+              className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none"
+            >
+              {[20, 50, 100].map((n) => (
+                <option key={n} value={n}>{n} baris</option>
+              ))}
+            </select>
+          </div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -254,7 +290,7 @@ export default function AsetTable({
               )}
               {data.map((aset, idx) => (
                 <tr key={aset.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-400 text-xs">{(page - 1) * 20 + idx + 1}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{(page - 1) * limit + idx + 1}</td>
                   <td className="px-4 py-3 font-medium text-gray-800 max-w-xs">
                     <div className="truncate">{aset.namaBarang}</div>
                   </td>
