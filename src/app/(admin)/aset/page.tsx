@@ -1,20 +1,27 @@
 import { prisma } from '@/lib/prisma'
 import AsetTable from '@/components/aset/AsetTable'
-import Link from 'next/link'
 import { Kondisi } from '@prisma/client'
 
 export default async function AsetPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string; kondisi?: string; sort?: string; order?: string }>
+  searchParams: Promise<{ page?: string; search?: string; kondisi?: string; sort?: string; order?: string; tahun?: string; lokasi?: string; foto?: string }>
 }) {
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1'))
   const limit = 20
   const search = params.search ?? ''
   const kondisiFilter = params.kondisi ?? ''
+  const tahunFilter = params.tahun ?? ''
+  const lokasiFilter = params.lokasi ?? ''
+  const fotoFilter = params.foto ?? ''
   const sort = params.sort ?? 'namaBarang'
   const order = params.order === 'desc' ? 'desc' : 'asc'
+
+  // Parse multi-select filters from comma-separated strings
+  const kondisiArr = kondisiFilter ? kondisiFilter.split(',').filter(Boolean) as Kondisi[] : []
+  const tahunArr = tahunFilter ? tahunFilter.split(',').map(Number).filter(Boolean) : []
+  const lokasiArr = lokasiFilter ? lokasiFilter.split(',').filter(Boolean) : []
 
   const where = {
     ...(search ? {
@@ -24,10 +31,14 @@ export default async function AsetPage({
         { nup: { contains: search, mode: 'insensitive' as const } },
       ],
     } : {}),
-    ...(kondisiFilter ? { kondisi: kondisiFilter as Kondisi } : {}),
+    ...(kondisiArr.length > 0 ? { kondisi: { in: kondisiArr } } : {}),
+    ...(tahunArr.length > 0 ? { tahunPerolehan: { in: tahunArr } } : {}),
+    ...(lokasiArr.length > 0 ? { lokasi: { in: lokasiArr } } : {}),
+    ...(fotoFilter === 'ada' ? { fotoUrl: { not: null } } : {}),
+    ...(fotoFilter === 'tidak' ? { fotoUrl: null } : {}),
   }
 
-  const [rawData, total] = await Promise.all([
+  const [rawData, total, distinctTahunRows] = await Promise.all([
     prisma.asetBmn.findMany({
       where,
       skip: (page - 1) * limit,
@@ -45,7 +56,17 @@ export default async function AsetPage({
       },
     }),
     prisma.asetBmn.count({ where }),
+    prisma.asetBmn.findMany({
+      select: { tahunPerolehan: true },
+      distinct: ['tahunPerolehan'],
+      where: { tahunPerolehan: { not: null } },
+      orderBy: { tahunPerolehan: 'desc' },
+    }),
   ])
+
+  const distinctTahun = distinctTahunRows
+    .map((r) => r.tahunPerolehan as number)
+    .filter(Boolean)
 
   return (
     <div>
@@ -71,8 +92,12 @@ export default async function AsetPage({
         totalPages={Math.ceil(total / limit)}
         search={search}
         kondisiFilter={kondisiFilter}
+        tahunFilter={tahunFilter}
+        lokasiFilter={lokasiFilter}
+        fotoFilter={fotoFilter}
         sort={sort}
         order={order}
+        distinctTahun={distinctTahun}
       />
     </div>
   )
