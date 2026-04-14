@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KONDISI_LABELS, getKlasifikasi, LOKASI_OPTIONS } from '@/lib/constants'
+import { compressImage } from '@/lib/imageUtils'
 
 interface AsetFormData {
   id?: string
@@ -69,11 +70,15 @@ export default function AsetForm({ initial }: { initial?: AsetFormData }) {
 
       // Upload foto if new file selected
       if (fotoFile) {
+        const compressed = await compressImage(fotoFile)
         const fd = new FormData()
-        fd.append('file', fotoFile)
+        fd.append('file', compressed)
         if (initial?.id) fd.append('asetId', initial.id)
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd })
-        if (!uploadRes.ok) throw new Error('Gagal upload foto')
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json().catch(() => ({}))
+          throw new Error(errData.error ?? 'Gagal upload foto')
+        }
         const uploadData = await uploadRes.json()
         fotoUrl = uploadData.url
       }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { KONDISI_LABELS, getKlasifikasi, LOKASI_OPTIONS } from '@/lib/constants'
+import { compressImage } from '@/lib/imageUtils'
 import { signOut } from 'next-auth/react'
 
 interface NupOption {
@@ -136,11 +137,15 @@ export default function UpdatePage() {
       let fotoUrl = selectedAset.fotoUrl
 
       if (fotoFile) {
+        const compressed = await compressImage(fotoFile)
         const fd = new FormData()
-        fd.append('file', fotoFile)
+        fd.append('file', compressed)
         fd.append('asetId', selectedAset.id)
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd })
-        if (!uploadRes.ok) throw new Error('Gagal upload foto')
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json().catch(() => ({}))
+          throw new Error(errData.error ?? 'Gagal upload foto')
+        }
         const uploadData = await uploadRes.json()
         fotoUrl = uploadData.url
       }
