@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateExcelLaporan } from '@/lib/exportExcel'
+import { adminApiScope } from '@/lib/scope'
 import { Kondisi } from '@prisma/client'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  const role = (session?.user as { role?: string })?.role
-  if (!session || role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await adminApiScope(req.nextUrl.searchParams.get('satker'))
+  if (!auth.ok) return auth.res
+
+  // A BMN report belongs to exactly one satker — refuse to emit a combined
+  // file that would look official but reconcile against nothing.
+  if (auth.ctx.scope.kind !== 'one') {
+    return NextResponse.json(
+      { error: 'Pilih satker terlebih dahulu — laporan dibuat per satker' },
+      { status: 400 },
+    )
+  }
+  const satkerId = auth.ctx.scope.satkerId
+
+  const satker = await prisma.satker.findUnique({ where: { id: satkerId } })
+  if (!satker) return NextResponse.json({ error: 'Satker tidak ditemukan' }, { status: 404 })
 
   const allAset = await prisma.asetBmn.findMany({
+    where: { satkerId },
     orderBy: [{ kondisi: 'asc' }, { no: 'asc' }],
   })
 
@@ -59,8 +71,11 @@ export async function GET(req: NextRequest) {
     }))
   }
 
-  const buffer = await generateExcelLaporan(asetByKondisi)
-  const filename = `Laporan_BMN_${new Date().toISOString().split('T')[0]}.xlsx`
+  // The caller used to omit this argument entirely, so the hardcoded
+  // 'BP3KP Jawa III' default always won — every satker's report would have
+  // carried the Balai's name in cell A2.
+  const buffer = await generateExcelLaporan(asetByKondisi, satker.namaLaporan)
+  const filename = `Laporan_BMN_${satkerId}_${new Date().toISOString().split('T')[0]}.xlsx`
 
   return new NextResponse(buffer as unknown as BodyInit, {
     headers: {

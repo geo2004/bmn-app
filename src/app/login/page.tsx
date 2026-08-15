@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { LOGIN_OPTIONS } from '@/lib/satker'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -22,14 +23,18 @@ export default function LoginPage() {
       redirect: false,
     })
 
-    setLoading(false)
-
     if (res?.error) {
+      setLoading(false)
       setError('Username atau password salah.')
-    } else {
-      if (username === 'admin') router.push('/dashboard')
-      else router.push('/update')
+      return
     }
+
+    // Route on the role the server actually issued, not on the typed username —
+    // usernames are now per-satker ('editor-jateng'), so string-matching 'admin'
+    // would silently send every editor to the wrong place.
+    const session = await getSession()
+    setLoading(false)
+    router.push(session?.user?.role === 'admin' ? '/dashboard' : '/update')
   }
 
   return (
@@ -46,22 +51,23 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--pkp-teal)', fontFamily: 'var(--font-poppins)' }}>
             Inventarisasi BMN
           </h1>
-          <p className="text-sm text-gray-500 mt-1">BP3KP Jawa III — Kementerian PKP</p>
+          <p className="text-sm text-gray-500 mt-1">BP3KP Jawa III &amp; Satker — Kementerian PKP</p>
         </div>
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Masuk sebagai</label>
               <select
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
                 style={{ '--tw-ring-color': 'var(--pkp-teal)' } as React.CSSProperties}
               >
-                <option value="admin">Admin</option>
-                <option value="editor">Editor (Petugas Lapangan)</option>
+                {LOGIN_OPTIONS.map((o) => (
+                  <option key={o.username} value={o.username}>{o.label}</option>
+                ))}
               </select>
             </div>
 

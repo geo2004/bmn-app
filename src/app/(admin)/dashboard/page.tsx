@@ -1,16 +1,26 @@
 import { prisma } from '@/lib/prisma'
 import DashboardStats from '@/components/dashboard/DashboardStats'
+import { adminPageScope } from '@/lib/scope'
 import { Kondisi } from '@prisma/client'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ satker?: string }>
+}) {
+  const params = await searchParams
+  const ctx = await adminPageScope(params.satker)
+
   const kondisiList: Kondisi[] = ['BAIK', 'RUSAK_RINGAN', 'RUSAK_BERAT', 'BERLEBIH', 'TIDAK_DITEMUKAN', 'SENGKETA']
 
-  const [counts, recent] = await Promise.all([
+  const [counts, recent, satker] = await Promise.all([
     prisma.asetBmn.groupBy({
       by: ['kondisi'],
+      where: ctx.where,
       _count: { _all: true },
     }),
     prisma.asetBmn.findMany({
+      where: ctx.where,
       orderBy: { updatedAt: 'desc' },
       take: 10,
       select: {
@@ -22,6 +32,9 @@ export default async function DashboardPage() {
         updatedAt: true,
       },
     }),
+    ctx.scope.kind === 'one'
+      ? prisma.satker.findUnique({ where: { id: ctx.scope.satkerId }, select: { nama: true } })
+      : Promise.resolve(null),
   ])
 
   const statsMap = Object.fromEntries(counts.map((c) => [c.kondisi, c._count._all]))
@@ -39,7 +52,9 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold" style={{ color: 'var(--pkp-teal)', fontFamily: 'var(--font-poppins)' }}>
           Dashboard
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">Ringkasan inventarisasi BMN BP3KP Jawa III</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Ringkasan inventarisasi BMN {satker?.nama ?? 'semua satker'}
+        </p>
       </div>
       <DashboardStats stats={stats} total={total} recent={recentSerialized} />
     </div>

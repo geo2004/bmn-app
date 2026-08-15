@@ -4,9 +4,9 @@ import { redirect } from 'next/navigation'
 
 export default async function RootPage() {
   const session = await getServerSession(authOptions)
-  const role = (session?.user as { role?: string })?.role
-
   if (!session) redirect('/login')
+
+  const { role } = session.user
   if (role === 'admin') redirect('/dashboard')
   if (role === 'editor') redirect('/update')
   redirect('/login')

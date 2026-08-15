@@ -1,84 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseExcelFile } from '@/lib/importExcel'
-import { Kondisi } from '@prisma/client'
+import { upsertAsetRows } from '@/lib/importUpsert'
+import { adminApiScope, resolveWriteSatker } from '@/lib/scope'
+
+// A 1000-row import will not finish inside the default serverless wall clock.
+export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  const role = (session?.user as { role?: string })?.role
-  if (!session || role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await adminApiScope(req.nextUrl.searchParams.get('satker'))
+  if (!auth.ok) return auth.res
 
   const formData = await req.formData()
   const file = formData.get('file') as File | null
-  const mode = (formData.get('mode') as string) ?? 'append' // 'append' | 'replace'
   const previewOnly = formData.get('preview') === 'true'
 
   if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
 
+  // The target satker comes from the request body, never from the URL or a
+  // cookie: this is the one operation that rewrites a whole satker at once.
+  const satkerId = resolveWriteSatker(auth.ctx, formData.get('satkerId'))
+  if (!satkerId) {
+    return NextResponse.json({ error: 'Pilih satker tujuan import' }, { status: 400 })
+  }
+
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
 
-  const results = parseExcelFile(buffer)
-  const preview = results.map(r => ({
+  let results
+  try {
+    results = parseExcelFile(buffer)
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Gagal membaca file' },
+      { status: 400 },
+    )
+  }
+
+  const rows = results.flatMap((r) => r.rows)
+  const preview = results.map((r) => ({
     sheetName: r.sheetName,
     kondisi: r.kondisi,
     count: r.rows.length,
     skipped: r.skipped,
   }))
-  const totalRows = results.reduce((s, r) => s + r.rows.length, 0)
 
   if (previewOnly) {
-    return NextResponse.json({ preview, totalRows })
+    const existing = await prisma.asetBmn.count({ where: { satkerId } })
+    return NextResponse.json({ preview, totalRows: rows.length, satkerId, existing })
   }
 
-  // Execute import
-  if (mode === 'replace') {
-    await prisma.asetBmn.deleteMany()
-  }
+  const before = await prisma.asetBmn.count({ where: { satkerId } })
 
-  let inserted = 0
-  let duplicates = 0
+  const outcome = await prisma.$transaction(
+    (tx) => upsertAsetRows(tx, rows, satkerId),
+    // The default interactive-transaction timeout is 5s, which a multi-chunk
+    // import blows through immediately.
+    { timeout: 120_000, maxWait: 20_000 },
+  )
 
-  for (const result of results) {
-    for (const row of result.rows) {
-      // Check duplicate
-      if (row.kodeBarang && row.nup) {
-        const existing = await prisma.asetBmn.findFirst({
-          where: { kodeBarang: row.kodeBarang, nup: row.nup },
-        })
-        if (existing && mode === 'append') {
-          duplicates++
-          continue
-        }
-      }
+  const after = await prisma.asetBmn.count({ where: { satkerId } })
+  const inserted = after - before
 
-      await prisma.asetBmn.create({
-        data: {
-          no: row.no,
-          kodeBarang: row.kodeBarang,
-          namaBarang: row.namaBarang,
-          nup: row.nup,
-          tahunPerolehan: row.tahunPerolehan,
-          merkType: row.merkType,
-          satuan: row.satuan,
-          kuantitas: row.kuantitas,
-          nilaiPerolehan: row.nilaiPerolehan,
-          menurutAdministrasi: row.menurutAdministrasi,
-          menurutInventarisasi: row.menurutInventarisasi,
-          kondisi: row.kondisi as Kondisi,
-          klasifikasi: row.klasifikasi,
-          lokasi: row.lokasi,
-          alamat: row.alamat,
-          koordinat: row.koordinat,
-          fotoUrl: row.fotoUrl,
-          ket: row.ket,
-        },
-      })
-      inserted++
-    }
-  }
-
-  return NextResponse.json({ success: true, inserted, duplicates, preview })
+  return NextResponse.json({
+    success: true,
+    satkerId,
+    inserted,
+    updated: outcome.processed - inserted,
+    unkeyed: outcome.unkeyed,
+    preview,
+  })
 }

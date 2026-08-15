@@ -1,40 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { unstable_cache } from 'next/cache'
 import AsetTable from '@/components/aset/AsetTable'
+import { adminPageScope } from '@/lib/scope'
 import { Kondisi } from '@prisma/client'
 
-// Distinct values change infrequently — cache for 60 seconds to avoid
-// re-querying the full table on every filter navigation.
-const getDistinctValues = unstable_cache(
-  async () => {
-    const [tahunRows, namaRows, nupRows] = await Promise.all([
-      prisma.asetBmn.findMany({
-        select: { tahunPerolehan: true },
-        distinct: ['tahunPerolehan'],
-        where: { tahunPerolehan: { not: null } },
-        orderBy: { tahunPerolehan: 'desc' },
-      }),
-      prisma.asetBmn.findMany({
-        select: { namaBarang: true },
-        distinct: ['namaBarang'],
-        orderBy: { namaBarang: 'asc' },
-      }),
-      prisma.asetBmn.findMany({
-        select: { nup: true },
-        distinct: ['nup'],
-        where: { nup: { not: null } },
-        orderBy: { nup: 'asc' },
-      }),
-    ])
-    return {
-      distinctTahun: tahunRows.map((r) => r.tahunPerolehan as number),
-      distinctNama: namaRows.map((r) => r.namaBarang),
-      distinctNup: nupRows.map((r) => r.nup as string),
-    }
-  },
-  ['aset-distinct-values'],
-  { revalidate: 60 },
-)
+/**
+ * Columns the table may be sorted by. `sort` arrives from the query string and
+ * used to be interpolated straight into orderBy.
+ */
+const SORTABLE = ['namaBarang', 'kodeBarang', 'nup', 'tahunPerolehan', 'kondisi', 'lokasi'] as const
+type SortColumn = (typeof SORTABLE)[number]
 
 export default async function AsetPage({
   searchParams,
@@ -42,9 +16,12 @@ export default async function AsetPage({
   searchParams: Promise<{
     page?: string; search?: string; kondisi?: string; sort?: string; order?: string
     tahun?: string; lokasi?: string; foto?: string; nama?: string; nup?: string; limit?: string
+    satker?: string
   }>
 }) {
   const params = await searchParams
+  const ctx = await adminPageScope(params.satker)
+
   const limitRaw = parseInt(params.limit ?? '20')
   const limit = [20, 50, 100].includes(limitRaw) ? limitRaw : 20
   const page = Math.max(1, parseInt(params.page ?? '1'))
@@ -55,7 +32,9 @@ export default async function AsetPage({
   const fotoFilter = params.foto ?? ''
   const namaFilter = params.nama ?? ''
   const nupFilter = params.nup ?? ''
-  const sort = params.sort ?? 'namaBarang'
+  const sort: SortColumn = (SORTABLE as readonly string[]).includes(params.sort ?? '')
+    ? (params.sort as SortColumn)
+    : 'namaBarang'
   const order = params.order === 'desc' ? 'desc' : 'asc'
 
   const kondisiArr = kondisiFilter ? kondisiFilter.split(',').filter(Boolean) as Kondisi[] : []
@@ -65,6 +44,7 @@ export default async function AsetPage({
   const nupArr = nupFilter ? nupFilter.split(',').filter(Boolean) : []
 
   const where = {
+    ...ctx.where,
     ...(search ? {
       OR: [
         { namaBarang: { contains: search, mode: 'insensitive' as const } },
@@ -81,7 +61,12 @@ export default async function AsetPage({
     ...(nupArr.length > 0 ? { nup: { in: nupArr } } : {}),
   }
 
-  const [rawData, total, { distinctTahun, distinctNama, distinctNup }] = await Promise.all([
+  // The distinct-value queries used to sit inside unstable_cache keyed on a
+  // literal string. That cache is shared across users on Vercel and survives
+  // redeploys, so a missing satker key part would have leaked one satker's
+  // item names into another's filters in a way a rollback could not undo.
+  // At ~1k rows these queries are free, so the cache is simply gone.
+  const [rawData, total, tahunRows, namaRows, nupRows, lokasiRows] = await Promise.all([
     prisma.asetBmn.findMany({
       where,
       skip: (page - 1) * limit,
@@ -99,7 +84,30 @@ export default async function AsetPage({
       },
     }),
     prisma.asetBmn.count({ where }),
-    getDistinctValues(),
+    prisma.asetBmn.findMany({
+      select: { tahunPerolehan: true },
+      distinct: ['tahunPerolehan'],
+      where: { ...ctx.where, tahunPerolehan: { not: null } },
+      orderBy: { tahunPerolehan: 'desc' },
+    }),
+    prisma.asetBmn.findMany({
+      select: { namaBarang: true },
+      distinct: ['namaBarang'],
+      where: ctx.where,
+      orderBy: { namaBarang: 'asc' },
+    }),
+    prisma.asetBmn.findMany({
+      select: { nup: true },
+      distinct: ['nup'],
+      where: { ...ctx.where, nup: { not: null } },
+      orderBy: { nup: 'asc' },
+    }),
+    prisma.lokasi.findMany({
+      where: ctx.where,
+      select: { nama: true },
+      distinct: ['nama'],
+      orderBy: [{ urutan: 'asc' }, { nama: 'asc' }],
+    }),
   ])
 
   return (
@@ -112,7 +120,7 @@ export default async function AsetPage({
           <p className="text-sm text-gray-500 mt-0.5">Kelola semua data aset inventarisasi</p>
         </div>
         <a
-          href="/api/export"
+          href={ctx.scope.kind === 'one' ? `/api/export?satker=${ctx.scope.satkerId}` : '/api/export'}
           className="px-4 py-2 rounded-lg text-sm font-medium border"
           style={{ color: 'var(--pkp-teal)', borderColor: 'var(--pkp-teal)' }}
         >
@@ -134,9 +142,10 @@ export default async function AsetPage({
         nupFilter={nupFilter}
         sort={sort}
         order={order}
-        distinctTahun={distinctTahun}
-        distinctNama={distinctNama}
-        distinctNup={distinctNup}
+        distinctTahun={tahunRows.map((r) => r.tahunPerolehan as number)}
+        distinctNama={namaRows.map((r) => r.namaBarang)}
+        distinctNup={nupRows.map((r) => r.nup as string)}
+        lokasiOptions={lokasiRows.map((r) => r.nama)}
       />
     </div>
   )

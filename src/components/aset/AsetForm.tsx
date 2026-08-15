@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { KONDISI_LABELS, getKlasifikasi, LOKASI_OPTIONS } from '@/lib/constants'
+import { KONDISI_LABELS, getKlasifikasi } from '@/lib/constants'
 import { compressImage } from '@/lib/imageUtils'
 
 interface AsetFormData {
@@ -26,7 +26,17 @@ interface AsetFormData {
   ket?: string | null
 }
 
-export default function AsetForm({ initial }: { initial?: AsetFormData }) {
+export default function AsetForm({
+  initial,
+  satkerId,
+  lokasiOptions,
+}: {
+  initial?: AsetFormData
+  /** Satker this asset belongs to. Sent on create; the server still re-checks it. */
+  satkerId: string
+  /** Room list for this satker, from the Lokasi table. */
+  lokasiOptions: string[]
+}) {
   const router = useRouter()
   const isEdit = !!initial?.id
 
@@ -87,6 +97,9 @@ export default function AsetForm({ initial }: { initial?: AsetFormData }) {
         ...form,
         klasifikasi: getKlasifikasi(form.kondisi),
         fotoUrl,
+        // Only meaningful on create; the server ignores it on update and
+        // re-validates it against the session either way.
+        satkerId,
       }
 
       const url = isEdit ? `/api/aset/${initial!.id}` : '/api/aset'
@@ -290,7 +303,13 @@ export default function AsetForm({ initial }: { initial?: AsetFormData }) {
               className={inputCls}
             >
               <option value="">— Pilih lokasi —</option>
-              {LOKASI_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+              {/* A <select> whose current value is absent from its options
+                  falls back to the first one, silently rewriting lokasi on
+                  save. Keep any stored-but-unlisted value selectable. */}
+              {form.lokasi && !lokasiOptions.includes(form.lokasi) && (
+                <option value={form.lokasi}>{form.lokasi} (tidak terdaftar)</option>
+              )}
+              {lokasiOptions.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
           <div>

@@ -1,11 +1,28 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import AsetForm from '@/components/aset/AsetForm'
+import { adminPageScope } from '@/lib/scope'
 
-export default async function EditAsetPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditAsetPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ satker?: string }>
+}) {
   const { id } = await params
-  const aset = await prisma.asetBmn.findUnique({ where: { id } })
+  const ctx = await adminPageScope((await searchParams).satker)
+
+  // findFirst rather than findUnique so the satker filter can apply — otherwise
+  // knowing an ID is enough to open any satker's asset.
+  const aset = await prisma.asetBmn.findFirst({ where: { id, ...ctx.where } })
   if (!aset) notFound()
+
+  const lokasiRows = await prisma.lokasi.findMany({
+    where: { satkerId: aset.satkerId },
+    select: { nama: true },
+    orderBy: [{ urutan: 'asc' }, { nama: 'asc' }],
+  })
 
   const initial = {
     id: aset.id,
@@ -36,7 +53,11 @@ export default async function EditAsetPage({ params }: { params: Promise<{ id: s
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">{aset.namaBarang}</p>
       </div>
-      <AsetForm initial={initial} />
+      <AsetForm
+        initial={initial}
+        satkerId={aset.satkerId}
+        lokasiOptions={lokasiRows.map((r) => r.nama)}
+      />
     </div>
   )
 }

@@ -1,14 +1,28 @@
 import { prisma } from '@/lib/prisma'
-import Link from 'next/link'
+import { adminPageScope } from '@/lib/scope'
 
-export default async function LaporanPage() {
-  const counts = await prisma.asetBmn.groupBy({
-    by: ['kondisi'],
-    _count: { _all: true },
-  })
+export default async function LaporanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ satker?: string }>
+}) {
+  const ctx = await adminPageScope((await searchParams).satker)
+
+  const [counts, withFoto, satkerList] = await Promise.all([
+    prisma.asetBmn.groupBy({ by: ['kondisi'], where: ctx.where, _count: { _all: true } }),
+    prisma.asetBmn.count({ where: { ...ctx.where, fotoUrl: { not: null } } }),
+    prisma.satker.findMany({ orderBy: { urutan: 'asc' }, select: { id: true, nama: true } }),
+  ])
 
   const total = counts.reduce((s, c) => s + c._count._all, 0)
-  const withFoto = await prisma.asetBmn.count({ where: { fotoUrl: { not: null } } })
+
+  // A BMN report is filed per satker, so the download always names one rather
+  // than silently combining every satker into a single official document.
+  const scope = ctx.scope
+  const targets =
+    scope.kind === 'one'
+      ? satkerList.filter((s) => s.id === scope.satkerId)
+      : satkerList
 
   return (
     <div>
@@ -43,14 +57,20 @@ export default async function LaporanPage() {
           <p className="text-xs text-gray-500 mb-4">
             File Excel akan berisi 7 sheet: Laporan ringkasan + 6 sheet per kondisi.
             Selisih administrasi vs inventarisasi dihitung otomatis.
+            Laporan dibuat per satker.
           </p>
-          <a
-            href="/api/export"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-sm font-medium"
-            style={{ background: 'var(--pkp-teal)' }}
-          >
-            📥 Download Laporan Excel
-          </a>
+          <div className="space-y-2">
+            {targets.map((s) => (
+              <a
+                key={s.id}
+                href={`/api/export?satker=${s.id}`}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-sm font-medium"
+                style={{ background: 'var(--pkp-teal)' }}
+              >
+                📥 Download Laporan {s.nama}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </div>

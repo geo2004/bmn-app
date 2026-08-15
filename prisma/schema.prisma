@@ -1,3 +1,11 @@
+// NOTE: this schema is maintained BY HAND against the live database.
+// Do NOT run `prisma db push` against production: this Supabase `public`
+// schema also holds ~50 tables belonging to four other applications, and
+// `db push` reconciles the entire schema against this file — it would
+// propose dropping all of them plus the AsetBmn backup table.
+// Apply DDL as reviewed SQL, then run `generate` only:
+//   node node_modules/prisma/build/index.js generate
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,6 +13,29 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// A work unit (satuan kerja). Each satker is an isolated data mart:
+/// editors only ever see their own, admins can see all.
+model Satker {
+  id          String    @id
+  nama        String
+  /// Unit name printed into the Excel report header (cell A2).
+  namaLaporan String
+  urutan      Int       @default(0)
+  aset        AsetBmn[]
+  lokasi      Lokasi[]
+}
+
+/// Per-satker room list, replacing the old hardcoded LOKASI_OPTIONS array.
+model Lokasi {
+  id       String @id @default(uuid())
+  satkerId String
+  nama     String
+  urutan   Int    @default(0)
+  satker   Satker @relation(fields: [satkerId], references: [id])
+
+  @@unique([satkerId, nama])
 }
 
 model AsetBmn {
@@ -27,11 +58,17 @@ model AsetBmn {
   koordinat            String?
   fotoUrl              String?
   ket                  String?
+  satkerId             String
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
+  satker Satker @relation(fields: [satkerId], references: [id])
+
+  /// Makes the import's duplicate rule something the database enforces, and
+  /// lets two satker legitimately hold the same kodeBarang + NUP.
+  @@unique([satkerId, kodeBarang, nup])
   @@index([namaBarang])
-  @@index([kodeBarang, nup])
+  @@index([satkerId])
 }
 
 enum Kondisi {

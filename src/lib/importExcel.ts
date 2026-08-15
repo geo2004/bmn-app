@@ -13,7 +13,8 @@ export interface AsetRow {
   nilaiPerolehan?: number
   menurutAdministrasi?: number
   menurutInventarisasi?: number
-  kondisi: string
+  /** undefined when the sheet did not state a condition — see mapKondisi(). */
+  kondisi?: string
   klasifikasi?: string
   lokasi?: string
   alamat?: string
@@ -34,7 +35,13 @@ function parseStr(val: unknown): string | undefined {
   return s === '' ? undefined : s
 }
 
-function mapKondisi(val: unknown): string {
+/**
+ * Returns undefined for a blank or unrecognised cell rather than defaulting to
+ * BAIK. On re-import the difference matters: "the sheet says BAIK" must
+ * overwrite, while "the sheet says nothing" must leave the condition recorded
+ * in the field untouched. New rows fall back to BAIK at insert time.
+ */
+function mapKondisi(val: unknown): string | undefined {
   const s = String(val ?? '').trim().toLowerCase()
   if (s === 'baik' || s === 'b') return 'BAIK'
   if (s === 'rusak ringan' || s === 'rr') return 'RUSAK_RINGAN'
@@ -42,7 +49,7 @@ function mapKondisi(val: unknown): string {
   if (s === 'tidak ditemukan' || s === 'td') return 'TIDAK_DITEMUKAN'
   if (s === 'berlebih' || s === 'be') return 'BERLEBIH'
   if (s === 'sengketa' || s === 's') return 'SENGKETA'
-  return 'BAIK'
+  return undefined
 }
 
 // Laporan sheet columns (0-indexed):
@@ -84,7 +91,7 @@ function parseRow(row: unknown[]): AsetRow | null {
     menurutAdministrasi: parseNum(row[8]),
     menurutInventarisasi: parseNum(row[11]),
     kondisi,
-    klasifikasi: getKlasifikasi(kondisi),
+    klasifikasi: kondisi ? getKlasifikasi(kondisi) : undefined,
     alamat: parseStr(row[16]),
     koordinat: parseStr(row[17]),
     fotoUrl: parseStr(row[18]),

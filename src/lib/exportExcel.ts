@@ -176,7 +176,10 @@ function addSummarySheet(workbook: ExcelJS.Workbook, stats: Record<string, numbe
 
 export async function generateExcelLaporan(
   asetByKondisi: Record<string, AsetData[]>,
-  unitName = 'BP3KP Jawa III'
+  // No default: the unit name must come from the satker being exported.
+  // A default here silently produced Balai-branded reports for every satker,
+  // because the only caller omitted the argument.
+  unitName: string
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'BMN App'

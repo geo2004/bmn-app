@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
-import { KONDISI_LABELS, LOKASI_OPTIONS } from '@/lib/constants'
+import { KONDISI_LABELS } from '@/lib/constants'
 import ColumnFilter from './ColumnFilter'
 
 interface Aset {
@@ -35,12 +35,14 @@ interface Props {
   distinctTahun: number[]
   distinctNama: string[]
   distinctNup: string[]
+  /** Room list for the active satker, from the Lokasi table. */
+  lokasiOptions: string[]
 }
 
 export default function AsetTable({
   data, total, page, totalPages, limit,
   search, kondisiFilter, tahunFilter, lokasiFilter, fotoFilter, namaFilter, nupFilter,
-  sort, order, distinctTahun, distinctNama, distinctNup,
+  sort, order, distinctTahun, distinctNama, distinctNup, lokasiOptions: lokasiList,
 }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -76,6 +78,10 @@ export default function AsetTable({
 
   function clearAllFilters() {
     const params = new URLSearchParams()
+    // The active satker is tenant state, not a filter — clearing filters must
+    // not silently drop it and swap the admin back to "Semua Satker".
+    const satker = searchParams.get('satker')
+    if (satker) params.set('satker', satker)
     if (search) params.set('search', search)
     if (sort !== 'namaBarang') params.set('sort', sort)
     if (order !== 'asc') params.set('order', order)
@@ -99,7 +105,7 @@ export default function AsetTable({
   // Option lists for each column
   const kondisiOptions = Object.entries(KONDISI_LABELS).map(([k, v]) => ({ value: k, label: v }))
   const tahunOptions = distinctTahun.map((y) => ({ value: String(y), label: String(y) }))
-  const lokasiOptions = LOKASI_OPTIONS.map((l) => ({ value: l, label: l }))
+  const lokasiOptions = lokasiList.map((l) => ({ value: l, label: l }))
   const fotoOptions = [
     { value: 'ada', label: 'Ada Foto' },
     { value: 'tidak', label: 'Tidak Ada Foto' },

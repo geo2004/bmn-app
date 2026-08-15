@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { KONDISI_LABELS, getKlasifikasi, LOKASI_OPTIONS } from '@/lib/constants'
+import { KONDISI_LABELS, getKlasifikasi } from '@/lib/constants'
 import { compressImage } from '@/lib/imageUtils'
 import { signOut } from 'next-auth/react'
 
@@ -58,12 +58,24 @@ export default function UpdatePage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
 
+  // Room list for this editor's satker. This page is a client component with
+  // no fetching server parent, so it pulls the list from the API.
+  const [lokasiOptions, setLokasiOptions] = useState<string[]>([])
+
   // Load distinct nama barang on mount
   useEffect(() => {
     fetch('/api/aset/cari?tipe=true')
       .then(r => r.json())
-      .then(data => setNamaList(data))
+      .then(data => setNamaList(Array.isArray(data) ? data : []))
       .finally(() => setLoadingNama(false))
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/lokasi')
+      .then(r => r.json())
+      .then((data: { nama: string }[]) =>
+        setLokasiOptions(Array.isArray(data) ? data.map(l => l.nama) : []))
+      .catch(() => setLokasiOptions([]))
   }, [])
 
   const suggestions = namaQuery.length >= 1
@@ -395,7 +407,13 @@ export default function UpdatePage() {
                 className={selectCls}
               >
                 <option value="">— Pilih lokasi —</option>
-                {LOKASI_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                {/* Keep a stored-but-unlisted value selectable: a <select>
+                    whose value is absent from its options silently falls back
+                    to the first one and rewrites the asset on save. */}
+                {lokasi && !lokasiOptions.includes(lokasi) && (
+                  <option value={lokasi}>{lokasi} (tidak terdaftar)</option>
+                )}
+                {lokasiOptions.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
 
